@@ -1,7 +1,9 @@
 package com.acsia.client.ui;
 
+import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.net.Uri;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -13,10 +15,12 @@ import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.SeekBar;
 import android.widget.Switch;
-import android.widget.Toast;
 
 import com.acsia.client.R;
+import com.acsia.client.support.ClientApplication;
+import com.acsia.client.support.Constants;
 import com.acsia.client.thrift.AudioManager;
+import com.acsia.client.thrift.PollingService;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -75,15 +79,19 @@ public class ThriftSettingsFragment extends Fragment {
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
+        System.out.println("ThriftSettingsFragment.onCreateView");
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.fragment_thrift_settings, container, false);
         localVolumeSeekBar = (SeekBar) view.findViewById(R.id.localSeekBar);
         remoteVolumeSeekBar = (SeekBar) view.findViewById(R.id.remoteSeekBar);
         localMuteSwitch = (Switch) view.findViewById(R.id.localMute);
         remoteMuteSwitch = (Switch) view.findViewById(R.id.remoteMute);
+
         configureView();
         return view;
     }
+
+
 
     private void configureView() {
         new Thread(new Runnable() {
@@ -106,8 +114,8 @@ public class ThriftSettingsFragment extends Fragment {
                             @Override
                             public void run() {
                                 //manage your edittext and Other UIs here
-                                initSeekBar(localMaxVolume, localVolume, remoteMaxVolume, remoteVolume);
-                                initMuteSwitch(localMuteStatus, remoteMuteStatus);
+                                configSeekBar(localMaxVolume, localVolume, remoteMaxVolume, remoteVolume);
+                                configureMuteSwitch(localMuteStatus, remoteMuteStatus);
                             }
                         });
                     }
@@ -128,6 +136,48 @@ public class ThriftSettingsFragment extends Fragment {
         }).start();
     }
 
+    private void configureMuteSwitch(int localMuteStatus, int remoteMuteStatus) {
+        initMuteSwitch(localMuteStatus, remoteMuteStatus);
+        configureLocalMuteSwitch();
+        configureRemoteMuteSwitch();
+    }
+
+    private void configureRemoteMuteSwitch() {
+        if (remoteMuteSwitch != null) {
+            remoteMuteSwitch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    boolean checked = ((Switch) view).isChecked();
+                    new VolumeTask(checked, AudioManager.Device.REMOTE, Constants.ACTION.MUTE_VOLUME).execute();
+                }
+            });
+        /*    remoteMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, final boolean checked) {
+                    new VolumeTask(checked, AudioManager.Device.REMOTE, Constants.ACTION.MUTE_VOLUME).execute();
+                }
+            });*/
+        }
+    }
+
+    private void configureLocalMuteSwitch() {
+        if (localMuteSwitch != null) {
+            localMuteSwitch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    boolean checked = ((Switch) view).isChecked();
+                    new VolumeTask(checked, AudioManager.Device.LOCAL, Constants.ACTION.MUTE_VOLUME).execute();
+                }
+            });
+            /*localMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+                @Override
+                public void onCheckedChanged(CompoundButton compoundButton, final boolean checked) {
+                    new VolumeTask(checked, AudioManager.Device.LOCAL, Constants.ACTION.MUTE_VOLUME).execute();
+                }
+            });*/
+        }
+    }
+
     private void initMuteSwitch(int localMuteStatus, int remoteMuteStatus) {
         boolean localMute = false, remoteMute = false;
         if (localMuteStatus == 0) {
@@ -138,60 +188,49 @@ public class ThriftSettingsFragment extends Fragment {
         }
         if (localMuteSwitch != null) {
             localMuteSwitch.setChecked(localMute);
-            localMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-                @Override
-                public void onCheckedChanged(CompoundButton compoundButton, final boolean checked) {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            boolean success = AudioManager.muteAudio(checked, AudioManager.Device.LOCAL);
-                            if (!success) {
-                                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        onButtonPressed("Failed to connect");
-                                    }
-                                });
-                            }
-                        }
-                    }).start();
-                }
-            });
         }
         if (remoteMuteSwitch != null) {
             remoteMuteSwitch.setChecked(remoteMute);
-            remoteMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+        }
+    }
+
+    private void configSeekBar(int localMaxVolume, int localVolume, int remoteMaxVolume, int remoteVolume) {
+        initSeekBar(localMaxVolume, localVolume, remoteMaxVolume, remoteVolume);
+        configureLocalSeekBar();
+        configureRemoteSeekBar();
+    }
+
+    private void configureRemoteSeekBar() {
+        if (remoteVolumeSeekBar != null) {
+            remoteVolumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
                 @Override
-                public void onCheckedChanged(CompoundButton compoundButton, final boolean checked) {
-                    new Thread(new Runnable() {
-                        @Override
-                        public void run() {
-                            boolean success = AudioManager.muteAudio(checked, AudioManager.Device.REMOTE);
-                            if (!success) {
-                                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                    @Override
-                                    public void run() {
-                                        onButtonPressed("Failed to connect");
-                                    }
-                                });
+                public void onProgressChanged(SeekBar seekBar, final int progress, boolean fromUser) {
+                    if (fromUser) {
+                        if (remoteMuteSwitch != null) {
+                            if (remoteMuteSwitch.isChecked()) {
+                                remoteMuteSwitch.performClick();
                             }
                         }
-                    }).start();
+                        new VolumeTask(progress, AudioManager.Device.REMOTE, Constants.ACTION.SET_VOLUME).execute();
+                    }
+                }
+
+                @Override
+                public void onStartTrackingTouch(SeekBar seekBar) {
+
+                }
+
+                @Override
+                public void onStopTrackingTouch(SeekBar seekBar) {
+
                 }
             });
         }
     }
 
-    static int localVolume;
-
-    private void initSeekBar(int localMaxVolume, int localVolume, int remoteMaxVolume, int remoteVolume) {
+    private void configureLocalSeekBar() {
         if (localVolumeSeekBar != null) {
-            localVolumeSeekBar.setMax(localMaxVolume);
-            localVolumeSeekBar.setKeyProgressIncrement(1);
-            localVolumeSeekBar.setProgress(localVolume);
-            ThriftSettingsFragment.localVolume = localVolume;
             localVolumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                boolean track = false;
 
                 @Override
                 public void onProgressChanged(SeekBar seekBar, final int progress, boolean fromUser) {
@@ -202,26 +241,7 @@ public class ThriftSettingsFragment extends Fragment {
                                 localMuteSwitch.performClick();
                             }
                         }
-                        new SetVolumeTask(progress, AudioManager.Device.LOCAL).execute();
-                     /*   new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                boolean success = false;
-                                try {
-                                    success = AudioManager.setVolume(progress, AudioManager.Device.LOCAL);
-                                } catch (Throwable e) {
-                                    e.printStackTrace();
-                                }
-                                if (!success) {
-                                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            onButtonPressed("Failed to connect");
-                                        }
-                                    });
-                                }
-                            }
-                        }).start();*/
+                        new VolumeTask(progress, AudioManager.Device.LOCAL, Constants.ACTION.SET_VOLUME).execute();
                     }
                 }
 
@@ -236,73 +256,43 @@ public class ThriftSettingsFragment extends Fragment {
                 }
             });
         }
+    }
 
+    private void initSeekBar(int localMaxVolume, int localVolume, int remoteMaxVolume, int remoteVolume) {
+        if (localVolumeSeekBar != null) {
+            localVolumeSeekBar.setMax(localMaxVolume);
+            localVolumeSeekBar.setKeyProgressIncrement(1);
+            localVolumeSeekBar.setProgress(localVolume);
+        }
         if (remoteVolumeSeekBar != null) {
             remoteVolumeSeekBar.setMax(remoteMaxVolume);
             remoteVolumeSeekBar.setKeyProgressIncrement(1);
             remoteVolumeSeekBar.setProgress(remoteVolume);
-            remoteVolumeSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-                @Override
-                public void onProgressChanged(SeekBar seekBar, final int progress, boolean fromUser) {
-                    if (fromUser) {
-                        if (remoteMuteSwitch != null) {
-                            if (remoteMuteSwitch.isChecked()) {
-                                remoteMuteSwitch.performClick();
-                            }
-                        }
-                        new SetVolumeTask(progress, AudioManager.Device.REMOTE).execute();
-                        /*new Thread(new Runnable() {
-                            @Override
-                            public void run() {
-                                boolean success = false;
-                                try {
-                                    success = AudioManager.setVolume(progress, AudioManager.Device.REMOTE);
-                                } catch (Throwable e) {
-                                    e.printStackTrace();
-                                }
-                                if (!success) {
-                                    new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            onButtonPressed("Failed to connect");
-                                            *//*   if (getActivity()!=null) {
-                                             Toast.makeText(getActivity(), "Failed to connect", Toast.LENGTH_SHORT);
-                                                getActivity().finish();
-                                            }*//*
-                                        }
-                                    });
-                                }
-                            }
-                        }).start();*/
-                    }
-                }
-
-                @Override
-                public void onStartTrackingTouch(SeekBar seekBar) {
-
-                }
-
-                @Override
-                public void onStopTrackingTouch(SeekBar seekBar) {
-
-                }
-            });
         }
     }
 
-    class SetVolumeTask extends AsyncTask<Void, Void, Boolean> {
-        int progress;
-        AudioManager.Device device;
+    class VolumeTask extends AsyncTask<Void, Void, Boolean> {
 
-        SetVolumeTask(int progress, AudioManager.Device device) {
+        Object value;
+        AudioManager.Device device;
+        Constants.ACTION action;
+
+        VolumeTask(Object value, AudioManager.Device device, Constants.ACTION action) {
             this.device = device;
-            this.progress = progress;
+            this.value = value;
+            this.action = action;
+            System.out.println("value = [" + value + "], device = [" + device + "], action = [" + action + "]");
         }
 
 
         @Override
         protected Boolean doInBackground(Void... voids) {
-            return AudioManager.setVolume(progress, device);
+            if (this.action == Constants.ACTION.SET_VOLUME) {
+                return AudioManager.setVolume((Integer) value, device);
+            } else {
+                return AudioManager.muteAudio((Boolean) value, device);
+            }
+
         }
 
         @Override
@@ -324,19 +314,46 @@ public class ThriftSettingsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
+        ClientApplication.getLocalBroadcastManager().registerReceiver(mYourBroadcastReceiver,
+                new IntentFilter(Constants.THRIFT_RECEIVER));
+        PollingService.startPollingService(getActivity());
         if (context instanceof OnFragmentInteractionListener) {
             mListener = (OnFragmentInteractionListener) context;
+
         } else {
             throw new RuntimeException(context.toString()
                     + " must implement OnFragmentInteractionListener");
         }
     }
 
+
     @Override
     public void onDetach() {
         super.onDetach();
         mListener = null;
+        ClientApplication.getLocalBroadcastManager().unregisterReceiver(mYourBroadcastReceiver);
+        PollingService.stopPollingService(getActivity());
     }
+
+    private final BroadcastReceiver mYourBroadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            boolean success = intent.getBooleanExtra(Constants.THRIFT_DATA_SUCCESS, false);
+            // System.out.println("ThriftSettingsFragment.onReceive::success = " + success);
+            if (success) {
+                int localMaxVolume = intent.getIntExtra(Constants.THRIFT_DATA_LOCAL_MAX_VOLUME, -1);
+                int localVolume = intent.getIntExtra(Constants.THRIFT_DATA_LOCAL_VOLUME, -1);
+                int localMuteStatus = intent.getIntExtra(Constants.THRIFT_DATA_LOCAL_MUTE_STATUS, -1);
+                int remoteMaxVolume = intent.getIntExtra(Constants.THRIFT_DATA_REMOTE_MAX_VOLUME, -1);
+                int remoteVolume = intent.getIntExtra(Constants.THRIFT_DATA_REMOTE_VOLUME, -1);
+                int remoteMuteStatus = intent.getIntExtra(Constants.THRIFT_DATA_REMOTE_MUTE_STATUS, -1);
+                initMuteSwitch(localMuteStatus, remoteMuteStatus);
+                initSeekBar(localMaxVolume, localVolume, remoteMaxVolume, remoteVolume);
+            } else {
+                onButtonPressed("Failed to connect");
+            }
+        }
+    };
 
     /**
      * This interface must be implemented by activities that contain this

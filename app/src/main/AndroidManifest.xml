@@ -39,8 +39,8 @@
             </intent-filter>
         </activity>
         <!--<category android:name="android.intent.category.HOME" />-->
-        <receiver android:name=".support.AlarmService" />
-
+        <receiver android:name=".thrift.InitHandler" />
+        <receiver android:name=".thrift.PollingService" />
 
     </application>
 

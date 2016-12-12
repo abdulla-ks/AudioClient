@@ -2,6 +2,7 @@ package com.acsia.client.ui;
 
 import android.content.Context;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -16,6 +17,7 @@ import android.widget.Toast;
 
 import com.acsia.client.R;
 import com.acsia.client.aidl.AudioManager;
+import com.acsia.client.support.Constants;
 
 /**
  * A simple {@link Fragment} subclass.
@@ -81,6 +83,15 @@ public class AIDLSettingsFragment extends Fragment {
         return view;
     }
 
+    @Override
+    public void setUserVisibleHint(boolean isVisibleToUser) {
+        super.setUserVisibleHint(isVisibleToUser);
+        if (isVisibleToUser) {
+            //things to do when fragment is visible
+            configureView();
+        }
+    }
+
     private void configureView() {
         new Thread(new Runnable() {
             @Override
@@ -117,7 +128,7 @@ public class AIDLSettingsFragment extends Fragment {
 
                                /* Toast.makeText(getActivity(), "Failed to connect", Toast.LENGTH_SHORT);
                                 getActivity().finish();*/
-                                onButtonPressed("Failed to connect");
+                            onButtonPressed("Failed to connect");
 
                         }
                     });
@@ -133,7 +144,14 @@ public class AIDLSettingsFragment extends Fragment {
         }
         if (localMuteSwitch != null) {
             localMuteSwitch.setChecked(localMute);
-            localMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+            localMuteSwitch.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    boolean checked = ((Switch) view).isChecked();
+                    new VolumeTask(checked, Constants.ACTION.MUTE_VOLUME).execute();
+                }
+            });
+          /*  localMuteSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                 @Override
                 public void onCheckedChanged(CompoundButton compoundButton, final boolean checked) {
                     new Thread(new Runnable() {
@@ -152,7 +170,7 @@ public class AIDLSettingsFragment extends Fragment {
                         }
                     }).start();
                 }
-            });
+            });*/
         }
 
     }
@@ -167,10 +185,12 @@ public class AIDLSettingsFragment extends Fragment {
                 public void onProgressChanged(SeekBar seekBar, final int progress, boolean fromUser) {
                     if (fromUser) {
                         if (localMuteSwitch != null) {
-                            if (localMuteSwitch.isChecked()){
+                            if (localMuteSwitch.isChecked()) {
                                 localMuteSwitch.performClick();
                             }
                         }
+                        new VolumeTask(progress, Constants.ACTION.SET_VOLUME).execute();
+                     /*
                         new Thread(new Runnable() {
                             @Override
                             public void run() {
@@ -184,7 +204,7 @@ public class AIDLSettingsFragment extends Fragment {
                                     });
                                 }
                             }
-                        }).start();
+                        }).start();*/
                     }
                 }
 
@@ -198,6 +218,46 @@ public class AIDLSettingsFragment extends Fragment {
 
                 }
             });
+        }
+    }
+
+    class VolumeTask extends AsyncTask<Void, Void, Boolean> {
+
+        Object value;
+        Constants.ACTION action;
+        int localVolume = 0;
+
+        VolumeTask(Object value, Constants.ACTION action) {
+            this.value = value;
+            this.action = action;
+            System.out.println("value = [" + value + "], action = [" + action + "]");
+        }
+
+
+        @Override
+        protected Boolean doInBackground(Void... voids) {
+            boolean success;
+            if (this.action == Constants.ACTION.SET_VOLUME) {
+                success = AudioManager.setVolume((Integer) value);
+            } else {
+                success = AudioManager.muteAudio((Boolean) value);
+                this.localVolume = AudioManager.getCurrentVolume();
+
+            }
+            return success;
+
+        }
+
+        @Override
+        protected void onPostExecute(Boolean success) {
+            super.onPostExecute(success);
+            if (!success) {
+                onButtonPressed("Failed to connect");
+            } else {
+                if (localVolumeSeekBar != null&&this.action != Constants.ACTION.SET_VOLUME) {
+                    localVolumeSeekBar.setProgress(this.localVolume);
+                }
+            }
         }
     }
 

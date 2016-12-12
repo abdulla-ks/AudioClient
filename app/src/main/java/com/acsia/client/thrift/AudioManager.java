@@ -108,24 +108,13 @@ public class AudioManager {
 
     public static int getMaximumVolume(Device device) {
         int maxVolume = -1;
-        if (device == Device.LOCAL) {
-            try {
-                if (!getInstance().isLocalClientOpen()) {//getInstance().localClient == null && 
-                    getInstance().startLocalClient();
-                }
-                maxVolume = getInstance().localClient.getMaxAudioLevel();
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            if (!getInstance().isClientOpen(device)) {
+                getInstance().startClient(device);
             }
-        } else {
-            try {
-                if (!getInstance().isRemoteClientOpen()) {//getInstance().remoteClient == null && 
-                    getInstance().startRemoteClient();
-                }
-                maxVolume = getInstance().remoteClient.getMaxAudioLevel();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            maxVolume = getInstance().getClient(device).getMaxAudioLevel();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return maxVolume;
     }
@@ -133,51 +122,31 @@ public class AudioManager {
 
     public static int getCurrentVolume(Device device) {
         int volume = -1;
-        if (device == Device.LOCAL) {
-            try {
-                if (!getInstance().isLocalClientOpen()) {//getInstance().localClient == null &&
-                    getInstance().startLocalClient();
-                }
-                volume = getInstance().localClient.getAudioLevel();
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            if (!getInstance().isClientOpen(device)) {
+                getInstance().startClient(device);
             }
-        } else {
-            try {
-                if (!getInstance().isRemoteClientOpen()) {//getInstance().remoteClient == null &&
-                    getInstance().startRemoteClient();
-                }
-                volume = getInstance().remoteClient.getAudioLevel();
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+            volume = getInstance().getClient(device).getAudioLevel();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return volume;
     }
 
     public static boolean setVolume(int volume, Device device) {
         boolean success = false;
-        if (device == Device.LOCAL) {
-            try {
-                if (!getInstance().isLocalClientOpen()) {//getInstance().localClient == null &&
-                    getInstance().startLocalClient();
-                }
-                success = getInstance().localClient.setAudioLevel(volume, false);
-            } catch (Exception e) {
-                e.printStackTrace();
+        try {
+            if (!getInstance().isClientOpen(device)) {
+                getInstance().startClient(device);
             }
-        } else {
-            try {
-                if (!getInstance().isRemoteClientOpen()) {//getInstance().remoteClient == null && 
-                    getInstance().startRemoteClient();
-                }
-                success = getInstance().remoteClient.setAudioLevel(volume, true);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
+
+            success = getInstance().getClient(device).setAudioLevel(volume, isHeadUnit(device));
+        } catch (Exception e) {
+            e.printStackTrace();
         }
         return success;
     }
+
 
     public static int isMute(Device device) {
         int status = -1;
@@ -193,33 +162,6 @@ public class AudioManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
-       /* if (device == Device.LOCAL) {
-            try {
-                if (!getInstance().isLocalClientOpen()) {//getInstance().localClient == null &&
-                    getInstance().startLocalClient();
-                }
-                if (getInstance().localClient.isMute()) {
-                    status = 0;
-                } else {
-                    status = 1;
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                if (!getInstance().isRemoteClientOpen()) {//getInstance().remoteClient == null && 
-                    getInstance().startRemoteClient();
-                }
-                if (getInstance().remoteClient.isMute()) {
-                    status = 0;
-                } else {
-                    status = 1;
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }*/
         return status;
     }
 
@@ -234,26 +176,15 @@ public class AudioManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
-       /* if (device == Device.LOCAL) {
-            try {
-                if (!getInstance().isLocalClientOpen()) {//getInstance().localClient == null && 
-                    getInstance().startLocalClient();
-                }
-                success = getInstance().localClient.muteAudio(mute);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        } else {
-            try {
-                if (!getInstance().isRemoteClientOpen()) {//getInstance().remoteClient == null && 
-                    getInstance().startRemoteClient();
-                }
-                success = getInstance().remoteClient.muteAudio(mute);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }*/
         return success;
+    }
+
+    private static boolean isHeadUnit(Device device) {
+        if (device == Device.LOCAL) {
+            return false;
+        } else {
+            return true;
+        }
     }
 
     private AudioService.Client getClient(Device device) {

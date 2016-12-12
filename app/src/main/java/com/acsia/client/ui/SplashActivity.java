@@ -1,19 +1,12 @@
 package com.acsia.client.ui;
 
-import android.annotation.SuppressLint;
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.Intent;
-import android.support.v7.app.ActionBar;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.os.Handler;
-import android.view.MotionEvent;
-import android.view.View;
 
 import com.acsia.client.R;
-import com.acsia.client.support.AlarmService;
-import com.acsia.client.thrift.AudioManager;
+import com.acsia.client.thrift.InitHandler;
 
 /**
  * An example full-screen activity that shows and hides the system UI (i.e.
@@ -30,7 +23,8 @@ public class SplashActivity extends AppCompatActivity {
         new Handler().postDelayed(new Runnable() {
             @Override
             public void run() {
-                Intent intent = new Intent(SplashActivity.this, AlarmService.class);
+                Intent intent = new Intent(SplashActivity.this, InitHandler.class);
+                intent.setAction("start.splash");
                 sendBroadcast(intent);
             }
         }, 500);
@@ -39,13 +33,13 @@ public class SplashActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        AlarmService.startClientService(getApplicationContext());
+        InitHandler.startClientService(getApplicationContext());
     }
 
     @Override
     protected void onPause() {
         super.onPause();
-        AlarmService.stopClientService(getApplicationContext());
+        InitHandler.stopClientService(getApplicationContext());
     }
 
     @Override

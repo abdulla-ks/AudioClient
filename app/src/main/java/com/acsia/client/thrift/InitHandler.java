@@ -1,4 +1,4 @@
-package com.acsia.client.support;
+package com.acsia.client.thrift;
 
 
 import android.app.AlarmManager;
@@ -7,50 +7,58 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
-import com.acsia.client.thrift.AudioManager;
+import com.acsia.client.support.Constants;
 import com.acsia.client.ui.MainActivity;
-import com.acsia.client.ui.SettingActivity;
 
 
 /**
  * Created by Acsia on 12/9/2016.
  */
 
-public class AlarmService extends BroadcastReceiver {
+public class InitHandler extends BroadcastReceiver {
 
     final public static String ONE_TIME = "onetime";
+    public static boolean started = false;
 
     @Override
     public void onReceive(final Context context, Intent intent) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (!AudioManager.getInstance().isClientOpen(AudioManager.Device.LOCAL)) {
-                        AudioManager.getInstance().startClient(AudioManager.Device.LOCAL);
-                    }
-                    if (!AudioManager.getInstance().isClientOpen(AudioManager.Device.REMOTE)) {
-                        AudioManager.getInstance().startClient(AudioManager.Device.REMOTE);
-                    }
+        System.out.println("InitHandler.onReceive");
+        if (!started) {
 
-                    if (AudioManager.getInstance().isClientOpen(AudioManager.Device.LOCAL)
-                            && AudioManager.getInstance().isClientOpen(AudioManager.Device.REMOTE)) {//) {//
-                        Intent mainIntent = new Intent(context, MainActivity.class);
-                        mainIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                        context.startActivity(mainIntent);
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        if (!AudioManager.getInstance().isClientOpen(AudioManager.Device.LOCAL)) {
+                            AudioManager.getInstance().startClient(AudioManager.Device.LOCAL);
+                        }
+                        if (!AudioManager.getInstance().isClientOpen(AudioManager.Device.REMOTE)) {
+                            AudioManager.getInstance().startClient(AudioManager.Device.REMOTE);
+                        }
+
+                        if (AudioManager.getInstance().isClientOpen(AudioManager.Device.LOCAL)
+                                && AudioManager.getInstance().isClientOpen(AudioManager.Device.REMOTE)) {//) {//
+                            Intent mainIntent = new Intent(context, MainActivity.class);
+                            mainIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                            context.startActivity(mainIntent);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-                } catch (Exception e) {
-                    e.printStackTrace();
                 }
-            }
-        }).start();
+            }).start();
+        }else {
+            stopClientService(context);
+        }
 
     }
 
     public static void startClientService(Context context) {
+        started = false;
         AlarmManager am = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        Intent intent = new Intent(context, AlarmService.class);
+        Intent intent = new Intent(context, InitHandler.class);
         intent.putExtra(ONE_TIME, Boolean.FALSE);
+        intent.setAction("start");
         PendingIntent pi = PendingIntent.getBroadcast(context, 0, intent, 0);
         //After after 30 seconds
 
@@ -58,7 +66,9 @@ public class AlarmService extends BroadcastReceiver {
     }
 
     public static void stopClientService(Context context) {
-        Intent intent = new Intent(context, AlarmService.class);
+        started = true;
+        Intent intent = new Intent(context, InitHandler.class);
+        intent.setAction("stop");
         PendingIntent sender = PendingIntent.getBroadcast(context, 0, intent, 0);
         AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         alarmManager.cancel(sender);
